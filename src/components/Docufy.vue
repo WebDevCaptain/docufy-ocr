@@ -38,6 +38,7 @@
 <script setup>
 import { ref, watch } from "vue";
 import Tesseract from "tesseract.js";
+import { pipeline } from "@huggingface/transformers";
 
 const imagePreview = ref(null);
 const detectedText = ref("");
@@ -88,10 +89,31 @@ const captureFromCamera = () => {
     });
 };
 
-const performOCR = async (image) => {
-  if (image) {
-    showSpinner.value = true;
+const runOCRwebGPU = async (imageUrl) => {
+  console.info("Running OCR on WebGPU");
 
+  const captioner = await pipeline(
+    "image-to-text",
+    "Xenova/trocr-small-handwritten"
+  );
+
+  const result = await captioner(imageUrl);
+  console.log(result);
+
+  detectedText.value = result.text;
+  showSpinner.value = false;
+};
+
+const performOCR = async (image) => {
+  showSpinner.value = true;
+
+  // Check WebGPU support
+  if (navigator.gpu) {
+    await runOCRwebGPU(image);
+    return;
+  }
+
+  if (image) {
     const {
       data: { text },
     } = await Tesseract.recognize(image, "eng", {
